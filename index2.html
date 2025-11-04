@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+     	<script src="https://dl.cineby.cc/rotate.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sports Events Viewer</title>
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+    <div class="container">
+        <div class="header" id="main-header">
+            <div id="header-content">
+                <h1>🏆 Sports Events 2025-11-04</h1>
+                <p>Live streaming schedules and channels</p>
+            </div>
+        </div>
+        
+        <div id="player-section" class="player-section" style="display:none;">
+            <div class="player-header">
+                <div class="now-playing">
+                    <span class="now-playing-label">▶ NOW PLAYING:</span>
+                    <span id="current-channel" class="current-channel-name"></span>
+                </div>
+                <button class="close-player-btn" onclick="closePlayer()">✕ Close Player</button>
+            </div>
+            <div class="player-wrapper">
+                <iframe id="main-player" class="main-iframe" frameborder="0" allowfullscreen></iframe>
+            </div>
+            
+            <div class="chat-container">
+                <iframe src="https://www5.cbox.ws/box/?boxid=959364&boxtag=sPnB5y" 
+                        class="chat-iframe"
+                        width="100%" 
+                        height="190" 
+                        allowtransparency="yes" 
+                        allow="autoplay" 
+                        frameborder="0" 
+                        marginheight="0" 
+                        marginwidth="0" 
+                        scrolling="auto">
+                </iframe>
+            </div>
+            
+            <div class="social-buttons-container">
+                <a href="https://raket.im/" class="social-button youtube-button" target="_blank">Nonton Films</a>
+                <a href="https://t.me/addlist/qpMuSt4AcIc1NzJh" class="social-button telegram-button" target="_blank">Telegram</a>
+                <a href="https://bio.link/raketbola" class="social-button whatsapp-button" target="_blank">WhatsApp</a>
+            </div>
+            </div>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label for="sportFilter">Sport:</label>
+                <select id="sportFilter">
+                    <option value="">All Sports</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="tournamentFilter">Tournament:</label>
+                <select id="tournamentFilter">
+                    <option value="">All Tournaments</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="searchFilter">Search (Match/Tournament/Sport):</label>
+                <input type="text" id="searchFilter" placeholder="Search events...">
+            </div>
+        </div>
+        
+        <div class="stats" id="stats"></div>
+        
+        <div class="events" id="events"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
