@@ -2,12 +2,31 @@ const apiUrl = 'https://topembed.pw/api.php?format=json';
 let allEvents = [];
 let filterTimeout; 
 let activeChannelButton = null; 
+const LIVE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
+
+// --- Date Formatting Function ---
+function getFormattedLocalDate() {
+    const today = new Date();
+    // Get year, month, and day respecting the user's local time zone
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 // --- Header Content Management ---
-const staticHeaderContent = `
-    <h1>Home | Sports Events 2025-11-04</h1>
-    <p>Live streaming schedules and channels</p>
-`;
+
+function getStaticHeaderContent() {
+    const todayDate = getFormattedLocalDate();
+    
+    return `
+        <h1>Home | Sports Events ${todayDate}</h1>
+        <p>Live streaming schedules and channels</p>
+      <a href="https://nunflix.shop" target="_blank" rel="noopener noreferrer">
+      <p>Click to Watch Movies</p>
+    </a>
+    `;
+}
 
 function updateHeader(isPlaying) {
     const headerDiv = document.getElementById('main-header');
@@ -17,7 +36,8 @@ function updateHeader(isPlaying) {
         headerContentDiv.innerHTML = ''; // Clear content
         headerDiv.classList.add('collapsed'); // Add class to collapse padding
     } else {
-        headerContentDiv.innerHTML = staticHeaderContent; // Restore content
+        // Use the function to get the latest content with the correct date
+        headerContentDiv.innerHTML = getStaticHeaderContent(); 
         headerDiv.classList.remove('collapsed'); // Remove class to restore padding
     }
 }
@@ -70,6 +90,8 @@ function loadWithIframe() {
         
         const onMessage = (e) => {
             try {
+                // NOTE: The origin check is speculative without knowing the iframe's exact origin policy.
+                // Assuming topembed.pw includes the correct origin in postMessage data.
                 if (e.origin.includes('topembed.pw')) {
                     window.removeEventListener('message', onMessage);
                     document.body.removeChild(iframe);
@@ -101,11 +123,10 @@ function processData(data) {
     
     // Sort events: Live > Upcoming > Past (most recent first)
     const now = Date.now() / 1000;
-    const LIVE_DURATION = 3 * 60 * 60; 
-
+    
     allEvents.sort((a, b) => {
-        const aIsLive = (a.unix_timestamp <= now) && (now - a.unix_timestamp < LIVE_DURATION);
-        const bIsLive = (b.unix_timestamp <= now) && (now - b.unix_timestamp < LIVE_DURATION);
+        const aIsLive = (a.unix_timestamp <= now) && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
+        const bIsLive = (b.unix_timestamp <= now) && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
 
         // 1. Prioritize Live events
         if (aIsLive && !bIsLive) return -1;
@@ -198,22 +219,20 @@ function displayEvents(events) {
     
     const fragment = document.createDocumentFragment();
     const now = Date.now() / 1000;
-    const LIVE_DURATION = 3 * 60 * 60; 
 
     for (const event of events) {
-        const isLive = (event.unix_timestamp <= now) && (now - event.unix_timestamp < LIVE_DURATION);
+        const isLive = (event.unix_timestamp <= now) && (now - event.unix_timestamp < LIVE_DURATION_SECONDS);
         
         const card = document.createElement('div');
         card.className = isLive ? 'event-card live-event' : 'event-card';
         
         const liveBadgeHtml = isLive ? '<span class="live-badge">LIVE</span>' : '';
         
-        // Ensure openChannel is globally accessible since it's used in HTML output
-        // We'll define it globally below but reference it here.
+        // Channel buttons with inline click handler
         const channelButtons = event.channels.map((channel, idx) => {
             const channelName = `Stream ${idx + 1}`; 
+            // Escape single quotes for use in string literal passed to openChannel
             const channelInfoArg = `${channelName} - ${event.match.replace(/'/g, "\\'")}`;
-            // Use window.openChannel to ensure global scope reference
             return `<button class="channel-link" data-url="${channel}" data-name="${channelInfoArg}" onclick="openChannel('${channel}', '${channelInfoArg}', this)">${channelName}</button>`;
         }).join('');
         
@@ -247,7 +266,8 @@ function updateStats(events) {
     const tournaments = new Set(events.map(e => e.tournament));
     const channels = new Set(events.flatMap(e => e.channels));
     
-    document.getElementById('stats').innerHTML = `
+    // Updated HTML structure for stats with ARIA Live Region
+    const statsHtml = `
         <div class="stat-item">
             <div class="stat-value">${events.length}</div>
             <div class="stat-label">Total Events</div>
@@ -265,6 +285,29 @@ function updateStats(events) {
             <div class="stat-label">Channels</div>
         </div>
     `;
+
+    const statsDiv = document.getElementById('stats');
+    // Ensure the ARIA attribute is set on the container element in the HTML
+    // For now, we update the innerHTML
+    statsDiv.innerHTML = statsHtml;
+
+    // Optional: Announce results for screen readers (using a simple text announcement)
+    const announcement = `${events.length} events found. ${sports.size} sports, ${tournaments.size} tournaments.`;
+    // Create a hidden live region for announcements if one doesn't exist
+    let liveRegion = document.getElementById('live-announcement');
+    if (!liveRegion) {
+        liveRegion = document.createElement('div');
+        liveRegion.id = 'live-announcement';
+        liveRegion.setAttribute('aria-live', 'polite');
+        liveRegion.style.position = 'absolute';
+        liveRegion.style.width = '1px';
+        liveRegion.style.height = '1px';
+        liveRegion.style.margin = '-1px';
+        liveRegion.style.padding = '0';
+        liveRegion.style.overflow = 'hidden';
+        document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = announcement;
 }
 
 function filterEvents() {
@@ -351,5 +394,10 @@ window.closePlayer = function() {
     updateHeader(false);
 }
 
-// Initial data load when the script is executed
+// --- Initial Execution ---
+
+// 1. Initialize the header immediately with the user's local date
+updateHeader(false); 
+
+// 2. Load the data
 loadData();
