@@ -97,19 +97,32 @@ hs.src = ('//s10.histats.com/js15_as.js');
 <script data-cfasync="false" async type="text/javascript" src="//mesnagebobble.com/gizI0ZYt1T8/97239"></script>
 <script data-cfasync="false" async type="text/javascript" src="//dt.sykerlycataian.com/rSOUK4v17uHiZM/104823"></script>
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  // Get today’s date in YYYY-MM-DD format
-  const today = new Date();
-  const formatted = today.getFullYear() + '-' +
-                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(today.getDate()).padStart(2, '0');
-  
-  // Update the H1 inside #header-content
-  const headerTitle = document.querySelector("#header-content h1");
-  if (headerTitle) {
-    headerTitle.textContent = `Home | Sports Events ${formatted}`;
+(function() {
+  function updateHeaderDate() {
+    const today = new Date();
+    const formatted = today.getFullYear() + '-' +
+                      String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                      String(today.getDate()).padStart(2, '0');
+
+    const headerTitle = document.querySelector("#header-content h1");
+    if (headerTitle) {
+      headerTitle.textContent = `Home | Sports Events ${formatted}`;
+    }
   }
-});
+
+  // Run when page is first loaded
+  document.addEventListener("DOMContentLoaded", updateHeaderDate);
+
+  // Run again whenever the user navigates back (bfcache restore)
+  window.addEventListener("pageshow", function(event) {
+    if (event.persisted) {
+      updateHeaderDate();
+    }
+  });
+
+  // Optional: refresh every hour in case user leaves tab open
+  setInterval(updateHeaderDate, 60 * 60 * 1000);
+})();
 </script>
 </body>
 </html>
