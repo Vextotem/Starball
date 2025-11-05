@@ -7,24 +7,22 @@ const LIVE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 // --- Date Formatting Function ---
 function getFormattedLocalDate() {
     const today = new Date();
-    // Get year, month, and day respecting the user's local time zone
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
 // --- Header Content Management ---
-
 function getStaticHeaderContent() {
     const todayDate = getFormattedLocalDate();
     
     return `
         <h1>Home | Sports Events ${todayDate}</h1>
         <p>Live streaming schedules and channels</p>
-      <a href="https://nunflix.shop" target="_blank" rel="noopener noreferrer">
-      <p>Click to Watch Movies</p>
-    </a>
+        <a href="https://nunflix.shop" target="_blank" rel="noopener noreferrer">
+            <p>Click to Watch Movies</p>
+        </a>
     `;
 }
 
@@ -33,16 +31,15 @@ function updateHeader(isPlaying) {
     const headerContentDiv = document.getElementById('header-content');
 
     if (isPlaying) {
-        headerContentDiv.innerHTML = ''; // Clear content
-        headerDiv.classList.add('collapsed'); // Add class to collapse padding
+        headerContentDiv.innerHTML = ''; 
+        headerDiv.classList.add('collapsed');
     } else {
-        // Use the function to get the latest content with the correct date
         headerContentDiv.innerHTML = getStaticHeaderContent(); 
-        headerDiv.classList.remove('collapsed'); // Remove class to restore padding
+        headerDiv.classList.remove('collapsed');
     }
 }
 
-// --- URL Parameter Initialization ---
+// --- URL Parameter Helper ---
 function getUrlParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
     const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
@@ -50,8 +47,7 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
-// --- Data Loading Functions ---
-
+// --- Data Loading ---
 async function loadData() {
     const eventsContainer = document.getElementById('events');
     eventsContainer.innerHTML = '<div class="no-results">Loading events...</div>';
@@ -90,8 +86,6 @@ function loadWithIframe() {
         
         const onMessage = (e) => {
             try {
-                // NOTE: The origin check is speculative without knowing the iframe's exact origin policy.
-                // Assuming topembed.pw includes the correct origin in postMessage data.
                 if (e.origin.includes('topembed.pw')) {
                     window.removeEventListener('message', onMessage);
                     document.body.removeChild(iframe);
@@ -113,7 +107,6 @@ function loadWithIframe() {
 }
 
 function processData(data) {
-    // Flatten events
     allEvents = [];
     for (const [date, events] of Object.entries(data.events)) {
         events.forEach(event => {
@@ -121,37 +114,29 @@ function processData(data) {
         });
     }
     
-    // Sort events: Live > Upcoming > Past (most recent first)
     const now = Date.now() / 1000;
     
     allEvents.sort((a, b) => {
         const aIsLive = (a.unix_timestamp <= now) && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
         const bIsLive = (b.unix_timestamp <= now) && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
 
-        // 1. Prioritize Live events
         if (aIsLive && !bIsLive) return -1;
         if (!aIsLive && bIsLive) return 1;
-        if (aIsLive && bIsLive) {
-            return b.unix_timestamp - a.unix_timestamp; 
-        }
+        if (aIsLive && bIsLive) return b.unix_timestamp - a.unix_timestamp; 
 
         const aIsUpcoming = a.unix_timestamp > now;
         const bIsUpcoming = b.unix_timestamp > now;
 
-        // 2. Prioritize Upcoming events
         if (aIsUpcoming && !bIsUpcoming) return -1;
         if (!aIsUpcoming && bIsUpcoming) return 1;
         if (aIsUpcoming && bIsUpcoming) {
             return a.unix_timestamp - b.unix_timestamp; 
         }
 
-        // 3. Both are Past
         return b.unix_timestamp - a.unix_timestamp; 
     });
     
     populateFilters();
-    
-    // Apply URL Parameters and Filter on Load
     applyUrlFilters();
 }
 
@@ -160,19 +145,12 @@ function applyUrlFilters() {
     const tournamentParam = getUrlParameter('tournament');
     const searchParam = getUrlParameter('search');
 
-    if (sportParam) {
-        document.getElementById('sportFilter').value = sportParam;
-    }
-    if (tournamentParam) {
-        document.getElementById('tournamentFilter').value = tournamentParam;
-    }
-    if (searchParam) {
-        document.getElementById('searchFilter').value = searchParam;
-    }
+    if (sportParam) document.getElementById('sportFilter').value = sportParam;
+    if (tournamentParam) document.getElementById('tournamentFilter').value = tournamentParam;
+    if (searchParam) document.getElementById('searchFilter').value = searchParam;
     
     filterEvents();
 }
-
 
 function populateFilters() {
     const sports = [...new Set(allEvents.map(e => e.sport))].sort();
@@ -228,10 +206,8 @@ function displayEvents(events) {
         
         const liveBadgeHtml = isLive ? '<span class="live-badge">LIVE</span>' : '';
         
-        // Channel buttons with inline click handler
         const channelButtons = event.channels.map((channel, idx) => {
             const channelName = `Stream ${idx + 1}`; 
-            // Escape single quotes for use in string literal passed to openChannel
             const channelInfoArg = `${channelName} - ${event.match.replace(/'/g, "\\'")}`;
             return `<button class="channel-link" data-url="${channel}" data-name="${channelInfoArg}" onclick="openChannel('${channel}', '${channelInfoArg}', this)">${channelName}</button>`;
         }).join('');
@@ -266,7 +242,6 @@ function updateStats(events) {
     const tournaments = new Set(events.map(e => e.tournament));
     const channels = new Set(events.flatMap(e => e.channels));
     
-    // Updated HTML structure for stats with ARIA Live Region
     const statsHtml = `
         <div class="stat-item">
             <div class="stat-value">${events.length}</div>
@@ -287,27 +262,7 @@ function updateStats(events) {
     `;
 
     const statsDiv = document.getElementById('stats');
-    // Ensure the ARIA attribute is set on the container element in the HTML
-    // For now, we update the innerHTML
     statsDiv.innerHTML = statsHtml;
-
-    // Optional: Announce results for screen readers (using a simple text announcement)
-    const announcement = `${events.length} events found. ${sports.size} sports, ${tournaments.size} tournaments.`;
-    // Create a hidden live region for announcements if one doesn't exist
-    let liveRegion = document.getElementById('live-announcement');
-    if (!liveRegion) {
-        liveRegion = document.createElement('div');
-        liveRegion.id = 'live-announcement';
-        liveRegion.setAttribute('aria-live', 'polite');
-        liveRegion.style.position = 'absolute';
-        liveRegion.style.width = '1px';
-        liveRegion.style.height = '1px';
-        liveRegion.style.margin = '-1px';
-        liveRegion.style.padding = '0';
-        liveRegion.style.overflow = 'hidden';
-        document.body.appendChild(liveRegion);
-    }
-    liveRegion.textContent = announcement;
 }
 
 function filterEvents() {
@@ -318,18 +273,16 @@ function filterEvents() {
     const filtered = allEvents.filter(event => {
         const sportMatch = !sportFilter || event.sport === sportFilter;
         const tournamentMatch = !tournamentFilter || event.tournament === tournamentFilter;
-        
         const searchMatch = !searchFilter || 
-                            event.match.toLowerCase().includes(searchFilter) ||
-                            event.tournament.toLowerCase().includes(searchFilter) ||
-                            event.sport.toLowerCase().includes(searchFilter);
+            event.match.toLowerCase().includes(searchFilter) ||
+            event.tournament.toLowerCase().includes(searchFilter) ||
+            event.sport.toLowerCase().includes(searchFilter);
         
         return sportMatch && tournamentMatch && searchMatch;
     });
     
     displayEvents(filtered);
     updateStats(filtered);
-
     updateUrlParameters(sportFilter, tournamentFilter, searchFilter);
 }
 
@@ -344,16 +297,15 @@ function updateUrlParameters(sport, tournament, search) {
     window.history.replaceState(null, '', url.toString());
 }
 
-// --- Event Listeners with Filter and URL Updates ---
+// --- Event Listeners ---
 document.getElementById('sportFilter').addEventListener('change', filterEvents);
 document.getElementById('tournamentFilter').addEventListener('change', filterEvents);
-
 document.getElementById('searchFilter').addEventListener('input', () => {
     clearTimeout(filterTimeout);
     filterTimeout = setTimeout(filterEvents, 300); 
 });
 
-// Make openChannel globally accessible as it's used in inline onclick
+// --- Global Player Functions ---
 window.openChannel = function(url, channelInfo, button) {
     const playerSection = document.getElementById('player-section');
     const mainPlayer = document.getElementById('main-player');
@@ -370,14 +322,10 @@ window.openChannel = function(url, channelInfo, button) {
     button.classList.add('active');
     activeChannelButton = button; 
     
-    // Scroll the player section to the top of the viewport instantly.
     playerSection.scrollIntoView({ behavior: 'instant', block: 'start' });
-
-    // Hide static header text and collapse container
     updateHeader(true);
 }
 
-// Make closePlayer globally accessible as it's used in inline onclick
 window.closePlayer = function() {
     const playerSection = document.getElementById('player-section');
     const mainPlayer = document.getElementById('main-player');
@@ -390,14 +338,19 @@ window.closePlayer = function() {
         activeChannelButton = null;
     }
 
-    // Restore static header text and container size
     updateHeader(false);
 }
 
-// --- Initial Execution ---
-
-// 1. Initialize the header immediately with the user's local date
-updateHeader(false); 
-
-// 2. Load the data
+// --- Initialize ---
+updateHeader(false);
 loadData();
+
+// --- Auto-update the date at midnight ---
+(function autoUpdateHeaderAtMidnight() {
+    const now = new Date();
+    const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+    setTimeout(() => {
+        updateHeader(false);
+        autoUpdateHeaderAtMidnight(); // reset timer
+    }, msUntilMidnight);
+})();
