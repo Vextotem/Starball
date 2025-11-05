@@ -5,7 +5,7 @@ let activeChannelButton = null;
 
 // --- Header Content Management ---
 const staticHeaderContent = `
-    <h1>🏆 Sports Events 2025-11-04</h1>
+    <h1>Home | Sports Events 2025-11-04</h1>
     <p>Live streaming schedules and channels</p>
 `;
 
