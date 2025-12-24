@@ -1,185 +1,263 @@
-/* ===========================
-   AD ROTATION HELPERS
-=========================== */
+const apiUrl = 'https://topembed.pw/api.php?format=json';
+let allEvents = [];
+let filterTimeout;
+let activeChannelButton = null;
+const LIVE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 
-let adToggle = 0;
+/* =======================
+   FOOTBALL PRIORITY SETUP
+   ======================= */
+const PRIORITY_SPORT = 'Football';
 
-function createImageBanner() {
-    const adDiv = document.createElement('div');
-    adDiv.className = 'match-ad-separator';
-    adDiv.innerHTML = `
-        <div class="separator" style="text-align:center;width:100%;">
-            <a href="https://ey43.com/4/6860097" target="_blank" rel="noopener">
-                <img src="https://embedsportex.pages.dev/api/ads-desk.gif"
-                     style="width:100%;height:auto;" alt="Advertisement">
-            </a>
-        </div>
+const POPULAR_FOOTBALL_LEAGUES = [
+    'Premier League',
+    'La Liga',
+    'Serie A',
+    'Bundesliga',
+    'Ligue 1',
+    'UEFA Champions League',
+    'UEFA Europa League',
+    'UEFA Conference League',
+    'FA Cup',
+    'Copa del Rey',
+    'World Cup',
+    'Euro'
+];
+
+/* =======================
+   DATE FORMAT
+   ======================= */
+function getFormattedLocalDate() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+/* =======================
+   HEADER
+   ======================= */
+function getStaticHeaderContent() {
+    return `
+        <h1>Home | Sports Events ${getFormattedLocalDate()}</h1>
+        <p>Live streaming schedules and channels</p>
+        <a href="https://nunflix.shop" target="_blank" rel="noopener noreferrer">
+            <p>Click to Watch Movies</p>
+        </a>
     `;
-    return adDiv;
 }
 
-function createIframeAd() {
-    const adDiv = document.createElement('div');
-    adDiv.className = 'match-ad-separator';
+function updateHeader(isPlaying) {
+    const headerDiv = document.getElementById('main-header');
+    const headerContentDiv = document.getElementById('header-content');
 
-    const script1 = document.createElement('script');
-    script1.text = `
-        atOptions = {
-            'key' : 'fe1c9e71cfc90fa0ffd2cdf0b4f11418',
-            'format' : 'iframe',
-            'height' : 250,
-            'width' : 300,
-            'params' : {}
-        };
-    `;
-
-    const script2 = document.createElement('script');
-    script2.src = 'https://brookrivet.com/fe1c9e71cfc90fa0ffd2cdf0b4f11418/invoke.js';
-    script2.async = true;
-
-    adDiv.appendChild(script1);
-    adDiv.appendChild(script2);
-
-    return adDiv;
+    if (isPlaying) {
+        headerContentDiv.innerHTML = '';
+        headerDiv.classList.add('collapsed');
+    } else {
+        headerContentDiv.innerHTML = getStaticHeaderContent();
+        headerDiv.classList.remove('collapsed');
+    }
 }
 
-function getAlternatingAd() {
-    adToggle++;
-    return adToggle % 2 === 0 ? createIframeAd() : createImageBanner();
+/* =======================
+   URL PARAMS
+   ======================= */
+function getUrlParameter(name) {
+    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    const results = regex.exec(location.search);
+    return results ? decodeURIComponent(results[1].replace(/\+/g, ' ')) : '';
 }
 
-/* ===========================
-   MAIN SCHEDULE LOGIC
-=========================== */
+/* =======================
+   DATA LOADING
+   ======================= */
+async function loadData() {
+    const eventsContainer = document.getElementById('events');
+    eventsContainer.innerHTML = '<div class="no-results">Loading events...</div>';
 
-let matchElements = [];
+    try {
+        const data = await fetch(apiUrl, { mode: 'cors', credentials: 'omit' }).then(r => r.json());
+        processData(data);
+    } catch {
+        eventsContainer.innerHTML = '<div class="no-results">Error loading data.</div>';
+    }
+}
 
-function displaySchedules() {
-    const container = document.getElementById('match-schedule');
+/* =======================
+   PROCESS & SORT DATA
+   ======================= */
+function processData(data) {
+    allEvents = [];
+
+    for (const [date, events] of Object.entries(data.events)) {
+        events.forEach(event => allEvents.push({ ...event, date }));
+    }
+
+    const now = Date.now() / 1000;
+
+    allEvents.sort((a, b) => {
+        const aIsLive = a.unix_timestamp <= now && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
+        const bIsLive = b.unix_timestamp <= now && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
+
+        const aIsFootball = a.sport === PRIORITY_SPORT;
+        const bIsFootball = b.sport === PRIORITY_SPORT;
+
+        const aPopular = aIsFootball && POPULAR_FOOTBALL_LEAGUES.some(l =>
+            a.tournament.toLowerCase().includes(l.toLowerCase())
+        );
+        const bPopular = bIsFootball && POPULAR_FOOTBALL_LEAGUES.some(l =>
+            b.tournament.toLowerCase().includes(l.toLowerCase())
+        );
+
+        /* LIVE first */
+        if (aIsLive && !bIsLive) return -1;
+        if (!aIsLive && bIsLive) return 1;
+
+        /* LIVE football first */
+        if (aIsLive && bIsLive) {
+            if (aIsFootball && !bIsFootball) return -1;
+            if (!aIsFootball && bIsFootball) return 1;
+
+            if (aPopular && !bPopular) return -1;
+            if (!aPopular && bPopular) return 1;
+
+            return b.unix_timestamp - a.unix_timestamp;
+        }
+
+        /* Upcoming football first */
+        if (aIsFootball && !bIsFootball) return -1;
+        if (!aIsFootball && bIsFootball) return 1;
+
+        if (aPopular && !bPopular) return -1;
+        if (!aPopular && bPopular) return 1;
+
+        return a.unix_timestamp - b.unix_timestamp;
+    });
+
+    populateFilters();
+    applyUrlFilters();
+}
+
+/* =======================
+   FILTERS
+   ======================= */
+function populateFilters() {
+    const sports = [...new Set(allEvents.map(e => e.sport))].sort();
+    const tournaments = [...new Set(allEvents.map(e => e.tournament))].sort();
+
+    const sportFilter = document.getElementById('sportFilter');
+    const tournamentFilter = document.getElementById('tournamentFilter');
+
+    sports.forEach(s => sportFilter.append(new Option(s, s)));
+    tournaments.forEach(t => tournamentFilter.append(new Option(t, t)));
+}
+
+function applyUrlFilters() {
+    document.getElementById('sportFilter').value = getUrlParameter('sport');
+    document.getElementById('tournamentFilter').value = getUrlParameter('tournament');
+    document.getElementById('searchFilter').value = getUrlParameter('search');
+    filterEvents();
+}
+
+function filterEvents() {
+    const sport = sportFilter.value;
+    const tournament = tournamentFilter.value;
+    const search = searchFilter.value.toLowerCase();
+
+    const filtered = allEvents.filter(e =>
+        (!sport || e.sport === sport) &&
+        (!tournament || e.tournament === tournament) &&
+        (!search || e.match.toLowerCase().includes(search) || e.tournament.toLowerCase().includes(search))
+    );
+
+    displayEvents(filtered);
+    updateStats(filtered);
+}
+
+/* =======================
+   DISPLAY
+   ======================= */
+function formatTime(ts) {
+    return new Date(ts * 1000).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function displayEvents(events) {
+    const container = document.getElementById('events');
     container.innerHTML = '';
-    matchElements = [];
-    adToggle = 0;
 
-    const sortedSchedules = sortSchedulesByLiveStatus([...schedules]);
-    let currentSection = '';
+    if (!events.length) {
+        container.innerHTML = '<div class="no-results">No events found.</div>';
+        return;
+    }
 
-    sortedSchedules.forEach((schedule, index) => {
-        const localDateTime = convertToLocalTime(schedule.time, schedule.date);
-        const matchStatus = getMatchStatus(schedule);
+    const now = Date.now() / 1000;
 
-        let sectionTitle = '';
-        if (matchStatus.status === 'live' && currentSection !== 'live') {
-            sectionTitle = '🔴 LIVE NOW';
-            currentSection = 'live';
-        } else if (matchStatus.status === 'upcoming-soon' && currentSection !== 'upcoming-soon') {
-            sectionTitle = '🕡 STARTING SOON';
-            currentSection = 'upcoming-soon';
-        } else if (matchStatus.status === 'upcoming' && currentSection !== 'upcoming') {
-            sectionTitle = '📅 UPCOMING MATCHES';
-            currentSection = 'upcoming';
-        }
+    events.forEach(event => {
+        const isLive = event.unix_timestamp <= now && (now - event.unix_timestamp < LIVE_DURATION_SECONDS);
 
-        if (sectionTitle) {
-            const sectionHeader = document.createElement('div');
-            sectionHeader.className = `section-header ${matchStatus.status === 'live' ? 'live' : ''}`;
-            sectionHeader.textContent = sectionTitle;
-            container.appendChild(sectionHeader);
-        }
+        const card = document.createElement('div');
+        card.className = `event-card ${isLive ? 'live-event' : ''}`;
 
-        const matchLink = document.createElement('a');
-        matchLink.href = schedule.buttons?.[0]?.link || 'javascript:void(0)';
-        matchLink.className = 'match-link';
-
-        const matchContainer = document.createElement('div');
-        matchContainer.className = `match-container ${matchStatus.status === 'live' ? 'live-match' : ''}`;
-
-        matchContainer.innerHTML = `
+        card.innerHTML = `
             <div class="event-header">
-                <img class="event-logo" src="${schedule.eventLogo}" width="30">
-                <span>${schedule.event}</span>
+                <div>
+                    <div class="match-name">${event.match} ${isLive ? '<span class="live-badge">LIVE</span>' : ''}</div>
+                    <div class="tournament-name">${event.tournament}</div>
+                </div>
+                <div>
+                    <span class="sport-badge">${event.sport}</span>
+                    <span class="time-badge">${formatTime(event.unix_timestamp)}</span>
+                </div>
             </div>
-
-            <div class="team-images">
-                <img src="${schedule.team1Image}" width="40">
-                <img src="${schedule.team2Image}" width="40">
-            </div>
-
-            <div class="matchup">${schedule.matchup}</div>
-
-            <div class="details">
-                <div class="date">${localDateTime.date}</div>
-                <div class="time">${localDateTime.time} (24 HOURS)</div>
+            <div class="channels">
+                ${event.channels.map((c, i) =>
+                    `<button class="channel-link" onclick="openChannel('${c}','Stream ${i + 1} - ${event.match}',this)">Stream ${i + 1}</button>`
+                ).join('')}
             </div>
         `;
 
-        if (matchStatus.status === 'live') {
-            matchContainer.innerHTML += `<div class="status Online">Live Now</div>`;
-        } else if (matchStatus.status === 'upcoming-soon') {
-            matchContainer.innerHTML += `<div class="live-icon">Starting Soon</div>`;
-        } else {
-            const hours = Math.floor(matchStatus.timeDiff / 3600000);
-            const minutes = Math.floor((matchStatus.timeDiff % 3600000) / 60000);
-            matchContainer.innerHTML += `<div class="countdown">Upcoming in ${hours}h ${minutes}m</div>`;
-        }
-
-        matchLink.appendChild(matchContainer);
-        container.appendChild(matchLink);
-
-        matchElements.push({
-            element: matchLink,
-            searchData: {
-                event: schedule.event.toLowerCase(),
-                matchup: schedule.matchup.toLowerCase(),
-                date: localDateTime.date.toLowerCase(),
-                time: localDateTime.time.toLowerCase()
-            }
-        });
-
-        /* 🔥 INSERT AD EVERY 4 MATCHES */
-        if ((index + 1) % 4 === 0) {
-            container.appendChild(getAlternatingAd());
-        }
-    });
-
-    updateSearchStats(sortedSchedules.length, sortedSchedules.length);
-}
-
-/* ===========================
-   SEARCH (ADS SAFE)
-=========================== */
-
-function setupSearch() {
-    const searchInput = document.getElementById('searchInput');
-
-    searchInput.addEventListener('input', function () {
-        const term = this.value.toLowerCase().trim();
-        const ads = document.querySelectorAll('.match-ad-separator');
-        const headers = document.querySelectorAll('.section-header');
-
-        let visible = 0;
-
-        matchElements.forEach(match => {
-            const data = match.searchData;
-            const show =
-                data.event.includes(term) ||
-                data.matchup.includes(term) ||
-                data.date.includes(term) ||
-                data.time.includes(term);
-
-            match.element.style.display = show ? 'block' : 'none';
-            if (show) visible++;
-        });
-
-        headers.forEach(h => h.style.display = term ? 'none' : 'block');
-        ads.forEach(ad => ad.style.display = term ? 'none' : 'block');
-
-        updateSearchStats(visible, schedules.length);
+        container.appendChild(card);
     });
 }
 
-/* ===========================
+/* =======================
+   STATS
+   ======================= */
+function updateStats(events) {
+    stats.innerHTML = `
+        <div class="stat-item"><div class="stat-value">${events.length}</div><div class="stat-label">Total Events</div></div>
+        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.sport)).size}</div><div class="stat-label">Sports</div></div>
+        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.tournament)).size}</div><div class="stat-label">Tournaments</div></div>
+    `;
+}
+
+/* =======================
+   PLAYER
+   ======================= */
+window.openChannel = function (url, info, btn) {
+    player-section.style.display = 'block';
+    main-player.src = url;
+    current-channel.textContent = info;
+
+    activeChannelButton?.classList.remove('active');
+    btn.classList.add('active');
+    activeChannelButton = btn;
+
+    updateHeader(true);
+};
+
+window.closePlayer = function () {
+    player-section.style.display = 'none';
+    main-player.src = '';
+    activeChannelButton?.classList.remove('active');
+    activeChannelButton = null;
+    updateHeader(false);
+};
+
+/* =======================
    INIT
-=========================== */
-
-displaySchedules();
-setupSearch();
+   ======================= */
+updateHeader(false);
+loadData();
