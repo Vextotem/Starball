@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -721,20 +722,18 @@ window.openChannel = function (url, info, btn, event) {
     
     pSec.style.display = 'block';
     
-    let finalUrl = '';
-    
     // The user wants the format: https://topembed.pw/channel/ChannelName
-    // If info contains ' vs ', it's an event, and 'url' is the channel link.
-    // If info does NOT contain ' vs ', it's a TV channel, and 'info' is the channel name.
+    // Based on the provided example: https://topembed.pw/channel/SkySportsNews%5BUK%5D
+    // We should use the channel name (info) for the URL.
     
+    let channelName = info;
+    
+    // If it's an event (contains ' vs '), we still want the channel name from the button text
     if (info.includes(' vs ')) {
-        // Event channel: use the link provided in 'url'
-        let channelParam = url.replace('/channel/', '');
-        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(channelParam);
-    } else {
-        // TV channel: use the channel name provided in 'info'
-        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(info);
+        channelName = btn.textContent || btn.innerText;
     }
+
+    const finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(channelName.trim());
 
     mPl.src = finalUrl;
     if(cCh) cCh.textContent = info;
@@ -773,4 +772,3 @@ function escapeHtml(text) {
     </script>
 </body>
 </html>
-
