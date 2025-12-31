@@ -215,8 +215,20 @@ window.openChannel = function (url, info, btn, event) {
     const mPl = document.getElementById('main-player');
     const cCh = document.getElementById('current-channel');
     if (!pSec || !mPl) return;
+    
     pSec.style.display = 'block';
-    mPl.src = url;
+    
+    // If the URL is just a name or a relative path, construct the full topembed URL
+    let finalUrl = url;
+    if (!url.startsWith('http')) {
+        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(url.replace('/channel/', ''));
+    } else if (url.includes('topembed.pw/channel/')) {
+        finalUrl = url;
+    } else {
+        finalUrl = url;
+    }
+
+    mPl.src = finalUrl;
     if(cCh) cCh.textContent = info;
     if (activeChannelButton) activeChannelButton.classList.remove('active');
     const actualBtn = btn && btn.tagName === 'BUTTON' ? btn : (btn ? btn.closest('button') : null);
