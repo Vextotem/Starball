@@ -1,291 +1,239 @@
-/* =======================
-   API CONFIG
-   ======================= */
-const EVENTS_API = 'https://beta.adstrim.ru/api/events';
-const CHANNELS_API = 'https://beta.adstrim.ru/api/channels';
-
+const BASE_URL = 'https://beta.adstrim.ru/api';
 let allEvents = [];
+let allChannels = [];
+let currentView = 'events'; 
 let activeChannelButton = null;
+
 const LIVE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 
-/* =======================
-   FOOTBALL PRIORITY
-   ======================= */
-const PRIORITY_SPORT = 'Football';
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    updateHeader(false);
+});
 
-const POPULAR_FOOTBALL_LEAGUES = [
-    'Premier League',
-    'La Liga',
-    'Serie A',
-    'Bundesliga',
-    'Ligue 1',
-    'UEFA Champions League',
-    'UEFA Europa League',
-    'UEFA Conference League',
-    'FA Cup',
-    'Copa del Rey',
-    'World Cup',
-    'Euro'
-];
-
-/* =======================
-   DATE
-   ======================= */
-function getFormattedLocalDate() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/* =======================
-   HEADER
-   ======================= */
-function getStaticHeaderContent() {
-    return `
-        <h1>Home | Sports Events ${getFormattedLocalDate()}</h1>
-        <p>Live streaming schedules and channels</p>
-        <a href="https://nunflix.shop" target="_blank" rel="noopener noreferrer">
-            <p>Click to Watch Movies</p>
-        </a>
-    `;
-}
-
-function updateHeader(isPlaying) {
-    const headerDiv = document.getElementById('main-header');
-    const headerContentDiv = document.getElementById('header-content');
-
-    if (isPlaying) {
-        headerContentDiv.innerHTML = '';
-        headerDiv.classList.add('collapsed');
-    } else {
-        headerContentDiv.innerHTML = getStaticHeaderContent();
-        headerDiv.classList.remove('collapsed');
-    }
-}
-
-/* =======================
-   URL PARAMS
-   ======================= */
-function getUrlParameter(name) {
-    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    const results = regex.exec(location.search);
-    return results ? decodeURIComponent(results[1].replace(/\+/g, ' ')) : '';
-}
-
-/* =======================
-   LOAD DATA
-   ======================= */
 async function loadData() {
-    const eventsContainer = document.getElementById('events');
-    eventsContainer.innerHTML = '<div class="no-results">Loading events...</div>';
+    const container = document.getElementById('events');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="loading">Loading matches and channels...</p>';
 
     try {
         const [eventsRes, channelsRes] = await Promise.all([
-            fetch(EVENTS_API),
-            fetch(CHANNELS_API)
+            fetch(`${BASE_URL}/events`).then(r => r.json()),
+            fetch(`${BASE_URL}/channels`).then(r => r.json())
         ]);
 
-        const eventsJson = await eventsRes.json();
-        const channelsJson = await channelsRes.json();
+        const now = Math.floor(Date.now() / 1000);
+        const CUTOFF_TIME = now - LIVE_DURATION_SECONDS; 
 
-        if (eventsJson.status !== 'success') {
-            throw new Error('Events API failed');
+        allEvents = [];
+        if (eventsRes.data && Array.isArray(eventsRes.data)) {
+            allEvents = eventsRes.data
+                .map(item => ({
+                    id: item.id || '',
+                    home_team: item.home_team || 'Unknown',
+                    away_team: item.away_team || 'Unknown',
+                    home_logo: item.home_team_image || '',
+                    away_logo: item.away_team_image || '',
+                    league_logo: item.league_image || '',
+                    tournament: item.league || 'General',
+                    sport: item.sport || 'Sports',
+                    unix_timestamp: item.timestamp || 0,
+                    channels: (item.channels || []).map(c => ({
+                        name: c.name || 'Stream',
+                        url: c.link || '#'
+                    }))
+                }))
+                .filter(event => event.unix_timestamp > CUTOFF_TIME);
         }
 
-        processData(eventsJson.data, channelsJson.data || []);
-    } catch (err) {
-        console.error(err);
-        eventsContainer.innerHTML = '<div class="no-results">Error loading data.</div>';
+        allChannels = channelsRes.channels || channelsRes.data || [];
+        allEvents.sort((a, b) => a.unix_timestamp - b.unix_timestamp);
+
+        populateFilters();
+        render();
+
+    } catch (error) {
+        console.error("Error loading data:", error);
+        container.innerHTML = '<div class="no-results">Error loading data. Please check connection.</div>';
     }
 }
 
-/* =======================
-   PROCESS DATA
-   ======================= */
-function processData(events, channels) {
-    allEvents = [];
+window.switchView = function(view) {
+    currentView = view;
+    const evBtn = document.getElementById('showEvents');
+    const chBtn = document.getElementById('showChannels');
+    if(evBtn) evBtn.classList.toggle('active', view === 'events');
+    if(chBtn) chBtn.classList.toggle('active', view === 'channels');
 
-    const channelMap = {};
-    channels.forEach(c => {
-        if (!channelMap[c.event_id]) channelMap[c.event_id] = [];
-        channelMap[c.event_id].push(c.stream_url);
-    });
+    const displayStyle = (view === 'events') ? 'block' : 'none';
+    const sGroup = document.getElementById('sport-filter-group');
+    const tGroup = document.getElementById('tournament-filter-group');
+    if(sGroup) sGroup.style.display = displayStyle;
+    if(tGroup) tGroup.style.display = displayStyle;
 
-    events.forEach(e => {
-        allEvents.push({
-            id: e.id,
-            sport: e.sport_name,
-            tournament: e.league_name,
-            match: `${e.home_team} vs ${e.away_team}`,
-            unix_timestamp: e.start_time,
-            channels: channelMap[e.id] || []
-        });
-    });
-
-    sortEvents();
-    populateFilters();
-    applyUrlFilters();
+    render();
 }
 
-/* =======================
-   SORT EVENTS
-   ======================= */
-function sortEvents() {
-    const now = Date.now() / 1000;
-
-    allEvents.sort((a, b) => {
-        const aLive = a.unix_timestamp <= now && now - a.unix_timestamp < LIVE_DURATION_SECONDS;
-        const bLive = b.unix_timestamp <= now && now - b.unix_timestamp < LIVE_DURATION_SECONDS;
-
-        const aFoot = a.sport === PRIORITY_SPORT;
-        const bFoot = b.sport === PRIORITY_SPORT;
-
-        const aPop = aFoot && POPULAR_FOOTBALL_LEAGUES.some(l => a.tournament.toLowerCase().includes(l.toLowerCase()));
-        const bPop = bFoot && POPULAR_FOOTBALL_LEAGUES.some(l => b.tournament.toLowerCase().includes(l.toLowerCase()));
-
-        if (aLive && !bLive) return -1;
-        if (!aLive && bLive) return 1;
-
-        if (aLive && bLive) {
-            if (aFoot && !bFoot) return -1;
-            if (!aFoot && bFoot) return 1;
-            if (aPop && !bPop) return -1;
-            if (!aPop && bPop) return 1;
-            return b.unix_timestamp - a.unix_timestamp;
-        }
-
-        if (aFoot && !bFoot) return -1;
-        if (!aFoot && bFoot) return 1;
-        if (aPop && !bPop) return -1;
-        if (!aPop && bPop) return 1;
-
-        return a.unix_timestamp - b.unix_timestamp;
-    });
-}
-
-/* =======================
-   FILTERS
-   ======================= */
-function populateFilters() {
-    const sportFilter = document.getElementById('sportFilter');
-    const tournamentFilter = document.getElementById('tournamentFilter');
-
-    sportFilter.innerHTML = '<option value="">All Sports</option>';
-    tournamentFilter.innerHTML = '<option value="">All Tournaments</option>';
-
-    [...new Set(allEvents.map(e => e.sport))].sort()
-        .forEach(s => sportFilter.append(new Option(s, s)));
-
-    [...new Set(allEvents.map(e => e.tournament))].sort()
-        .forEach(t => tournamentFilter.append(new Option(t, t)));
-}
-
-function applyUrlFilters() {
-    document.getElementById('sportFilter').value = getUrlParameter('sport');
-    document.getElementById('tournamentFilter').value = getUrlParameter('tournament');
-    document.getElementById('searchFilter').value = getUrlParameter('search');
-    filterEvents();
-}
-
-function filterEvents() {
-    const sport = sportFilter.value;
-    const tournament = tournamentFilter.value;
-    const search = searchFilter.value.toLowerCase();
-
-    const filtered = allEvents.filter(e =>
-        (!sport || e.sport === sport) &&
-        (!tournament || e.tournament === tournament) &&
-        (!search || e.match.toLowerCase().includes(search) || e.tournament.toLowerCase().includes(search))
-    );
-
-    displayEvents(filtered);
-    updateStats(filtered);
-}
-
-/* =======================
-   DISPLAY
-   ======================= */
-function formatTime(ts) {
-    return new Date(ts * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-function displayEvents(events) {
+function render() {
     const container = document.getElementById('events');
-    container.innerHTML = '';
+    const searchInput = document.getElementById('searchFilter');
+    const search = searchInput ? searchInput.value.toLowerCase() : "";
+    
+    if (currentView === 'events') {
+        const sEl = document.getElementById('sportFilter');
+        const tEl = document.getElementById('tournamentFilter');
+        const sport = sEl ? sEl.value : "";
+        const tournament = tEl ? tEl.value : "";
 
-    if (!events.length) {
-        container.innerHTML = '<div class="no-results">No events found.</div>';
-        return;
+        const filtered = allEvents.filter(e => {
+            // Safety check: ensure values exist before calling toLowerCase()
+            const matchName = `${e.home_team} ${e.away_team} ${e.tournament}`.toLowerCase();
+            const matchSearch = matchName.includes(search);
+            const matchSport = !sport || e.sport === sport;
+            const matchTournament = !tournament || e.tournament === tournament;
+            return matchSearch && matchSport && matchTournament;
+        });
+
+        displayEvents(filtered, container);
+        updateStats(filtered.length, "Matches Today");
+    } else {
+        const filtered = allChannels.filter(c => {
+            const name = c.name ? c.name.toLowerCase() : "";
+            return name.includes(search);
+        });
+        displayChannels(filtered, container);
+        updateStats(filtered.length, "TV Channels");
+    }
+}
+
+function displayEvents(events, container) {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!events.length) { 
+        container.innerHTML = '<div class="no-results">No matches found for today.</div>'; 
+        return; 
     }
 
-    const now = Date.now() / 1000;
+    const now = Math.floor(Date.now() / 1000);
 
-    events.forEach(e => {
-        const isLive = e.unix_timestamp <= now && now - e.unix_timestamp < LIVE_DURATION_SECONDS;
-
+    events.forEach(event => {
+        const isLive = event.unix_timestamp <= now && (now - event.unix_timestamp < LIVE_DURATION_SECONDS);
         const card = document.createElement('div');
         card.className = `event-card ${isLive ? 'live-event' : ''}`;
+        
+        const channelButtons = event.channels.map(c => 
+            `<button class="channel-link" onclick="openChannel('${c.url}', '${event.home_team} vs ${event.away_team}', this)">${c.name}</button>`
+        ).join('');
+
+        const timeString = new Date(event.unix_timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
         card.innerHTML = `
             <div class="event-header">
-                <div>
-                    <div class="match-name">${e.match} ${isLive ? '<span class="live-badge">LIVE</span>' : ''}</div>
-                    <div class="tournament-name">${e.tournament}</div>
+                <div class="match-info-container">
+                    <img src="${event.league_logo}" class="league-logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/5351/5351486.png'">
+                    <div>
+                        <div class="teams-display">
+                            <img src="${event.home_logo}" class="team-logo" onerror="this.style.display='none'">
+                            <span>${event.home_team}</span>
+                            <span class="vs-text">vs</span>
+                            <span>${event.away_team}</span>
+                            <img src="${event.away_logo}" class="team-logo" onerror="this.style.display='none'">
+                            ${isLive ? '<span class="live-badge">LIVE</span>' : ''}
+                        </div>
+                        <div class="tournament-name">${event.tournament}</div>
+                    </div>
                 </div>
-                <div>
-                    <span class="sport-badge">${e.sport}</span>
-                    <span class="time-badge">${formatTime(e.unix_timestamp)}</span>
+                <div class="event-meta">
+                    <span class="sport-badge">${event.sport}</span>
+                    <span class="time-badge">${timeString}</span>
                 </div>
             </div>
             <div class="channels">
-                ${e.channels.length
-                    ? e.channels.map((c, i) =>
-                        `<button class="channel-link" onclick="openChannel('${c}','Stream ${i + 1} - ${e.match}',this)">Stream ${i + 1}</button>`
-                      ).join('')
-                    : '<span class="no-channels">No streams available</span>'
-                }
+                ${channelButtons}
             </div>
         `;
-
         container.appendChild(card);
     });
 }
 
-/* =======================
-   STATS
-   ======================= */
-function updateStats(events) {
-    stats.innerHTML = `
-        <div class="stat-item"><div class="stat-value">${events.length}</div><div class="stat-label">Events</div></div>
-        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.sport)).size}</div><div class="stat-label">Sports</div></div>
-        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.tournament)).size}</div><div class="stat-label">Leagues</div></div>
-    `;
+function displayChannels(channels, container) {
+    if(!container) return;
+    container.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'channels-grid';
+
+    channels.forEach(channel => {
+        const btn = document.createElement('button');
+        btn.className = 'channel-big';
+        const url = channel.url || channel.link || '#'; 
+        const name = channel.name || "Unknown Channel";
+        btn.innerHTML = `<span>${name}</span>`;
+        btn.onclick = (e) => openChannel(url, name, e.target);
+        grid.appendChild(btn);
+    });
+    container.appendChild(grid);
 }
 
-/* =======================
-   PLAYER
-   ======================= */
+function populateFilters() {
+    const sF = document.getElementById('sportFilter');
+    const tF = document.getElementById('tournamentFilter');
+    if (sF && tF) {
+        const curS = sF.value;
+        const curT = tF.value;
+        sF.innerHTML = '<option value="">All Sports</option>';
+        tF.innerHTML = '<option value="">All Tournaments</option>';
+        
+        const sports = [...new Set(allEvents.map(e => e.sport))].filter(Boolean).sort();
+        const tournaments = [...new Set(allEvents.map(e => e.tournament))].filter(Boolean).sort();
+        
+        sports.forEach(s => sF.append(new Option(s, s)));
+        tournaments.forEach(t => tF.append(new Option(t, t)));
+        sF.value = curS; tF.value = curT;
+    }
+}
+
+// Global listeners with safety checks
+const sf = document.getElementById('sportFilter');
+const tf = document.getElementById('tournamentFilter');
+const searchf = document.getElementById('searchFilter');
+
+if(sf) sf.addEventListener('change', render);
+if(tf) tf.addEventListener('change', render);
+if(searchf) searchf.addEventListener('input', render);
+
+function updateStats(count, label) {
+    const stats = document.getElementById('stats');
+    if (stats) stats.innerHTML = `<div class="stat-item"><div class="stat-value">${count}</div><div class="stat-label">${label}</div></div>`;
+}
+
 window.openChannel = function (url, info, btn) {
-    document.getElementById('player-section').style.display = 'block';
-    document.getElementById('main-player').src = url;
-    document.getElementById('current-channel').textContent = info;
-
-    activeChannelButton?.classList.remove('active');
-    btn.classList.add('active');
-    activeChannelButton = btn;
-
+    const pSec = document.getElementById('player-section');
+    const mPl = document.getElementById('main-player');
+    const cCh = document.getElementById('current-channel');
+    if (!pSec || !mPl) return;
+    pSec.style.display = 'block';
+    mPl.src = url;
+    if(cCh) cCh.textContent = info;
+    if (activeChannelButton) activeChannelButton.classList.remove('active');
+    const actualBtn = btn.tagName === 'BUTTON' ? btn : btn.closest('button');
+    if (actualBtn) { actualBtn.classList.add('active'); activeChannelButton = actualBtn; }
+    window.scrollTo({top: 0, behavior: 'smooth'});
     updateHeader(true);
 };
 
 window.closePlayer = function () {
-    document.getElementById('player-section').style.display = 'none';
-    document.getElementById('main-player').src = '';
-    activeChannelButton?.classList.remove('active');
+    const pSec = document.getElementById('player-section');
+    const mPl = document.getElementById('main-player');
+    if(pSec) pSec.style.display = 'none';
+    if(mPl) mPl.src = '';
+    if (activeChannelButton) activeChannelButton.classList.remove('active');
     activeChannelButton = null;
     updateHeader(false);
 };
 
-/* =======================
-   INIT
-   ======================= */
-updateHeader(false);
-loadData();
+function updateHeader(isPlaying) {
+    const hDiv = document.getElementById('main-header');
+    if(hDiv) hDiv.style.display = isPlaying ? 'none' : 'block';
+}
+
