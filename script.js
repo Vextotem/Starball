@@ -33,7 +33,10 @@ async function loadData() {
         ]);
 
         const now = Math.floor(Date.now() / 1000);
-        const CUTOFF_TIME = now - LIVE_DURATION_SECONDS; 
+        // Set cutoff to the beginning of today (local time) to show all today's matches
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const CUTOFF_TIME = Math.floor(today.getTime() / 1000);
 
         allEvents = [];
         if (eventsRes.data && Array.isArray(eventsRes.data)) {
@@ -53,7 +56,7 @@ async function loadData() {
                         url: c.link || '#'
                     }))
                 }))
-                .filter(event => event.unix_timestamp > CUTOFF_TIME);
+                .filter(event => event.unix_timestamp >= CUTOFF_TIME);
         }
 
         const rawChannels = channelsRes.channels || channelsRes.data || [];
