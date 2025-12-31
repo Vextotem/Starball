@@ -1,3 +1,4 @@
+
 const BASE_URL = 'https://beta.adstrim.ru/api';
 let allEvents = [];
 let allChannels = [];
@@ -64,7 +65,6 @@ async function loadData() {
             name: c.name || 'Unknown Channel',
             url: c.link || c.url || '#'
         }));
-        allEvents.sort((a, b) => a.unix_timestamp - b.unix_timestamp);
 
         populateFilters();
         render();
@@ -73,6 +73,41 @@ async function loadData() {
         console.error("Error loading data:", error);
         container.innerHTML = '<div class="no-results">Error loading data. Please check connection.</div>';
     }
+}
+
+function sortEventsByPriority(events) {
+    const now = Math.floor(Date.now() / 1000);
+    
+    return events.sort((a, b) => {
+        const aIsLive = a.unix_timestamp <= now && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
+        const bIsLive = b.unix_timestamp <= now && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
+        
+        // Priority 1: Live events first
+        if (aIsLive && !bIsLive) return -1;
+        if (!aIsLive && bIsLive) return 1;
+        
+        // If both are live or both are not live, check sport and tournament
+        if (aIsLive === bIsLive) {
+            const aIsFootball = a.sport.toLowerCase().includes('football') || a.sport.toLowerCase().includes('soccer');
+            const bIsFootball = b.sport.toLowerCase().includes('football') || b.sport.toLowerCase().includes('soccer');
+            
+            const aIsPremierLeague = a.tournament.toLowerCase().includes('premier league');
+            const bIsPremierLeague = b.tournament.toLowerCase().includes('premier league');
+            
+            // Priority 2: Football Premier League
+            if (aIsFootball && aIsPremierLeague && !(bIsFootball && bIsPremierLeague)) return -1;
+            if (bIsFootball && bIsPremierLeague && !(aIsFootball && aIsPremierLeague)) return 1;
+            
+            // Priority 3: Football (any league)
+            if (aIsFootball && !bIsFootball) return -1;
+            if (!aIsFootball && bIsFootball) return 1;
+            
+            // Priority 4: Time (earlier first)
+            return a.unix_timestamp - b.unix_timestamp;
+        }
+        
+        return 0;
+    });
 }
 
 window.switchView = function(view) {
@@ -110,8 +145,11 @@ function render() {
             return matchSearch && matchSport && matchTournament;
         });
 
-        displayEvents(filtered, container);
-        updateStats(filtered.length, "Matches Today");
+        // Apply priority sorting
+        const sorted = sortEventsByPriority(filtered);
+
+        displayEvents(sorted, container);
+        updateStats(sorted.length, "Matches Today");
     } else {
         const filtered = allChannels.filter(c => {
             const name = c.name ? c.name.toLowerCase() : "";
@@ -225,13 +263,8 @@ window.openChannel = function (url, info, btn, event) {
     
     pSec.style.display = 'block';
     
-    // The user wants the format: https://topembed.pw/channel/ChannelName
-    // Based on the provided example: https://topembed.pw/channel/SkySportsNews%5BUK%5D
-    // We should use the channel name (info) for the URL.
-    
     let channelName = info;
     
-    // If it's an event (contains ' vs '), we still want the channel name from the button text
     if (info.includes(' vs ')) {
         channelName = btn.textContent || btn.innerText;
     }
@@ -272,4 +305,3 @@ function escapeHtml(text) {
     };
     return text.replace(/[&<>"']/g, m => map[m]);
 }
-
