@@ -56,7 +56,11 @@ async function loadData() {
                 .filter(event => event.unix_timestamp > CUTOFF_TIME);
         }
 
-        allChannels = channelsRes.channels || channelsRes.data || [];
+        const rawChannels = channelsRes.channels || channelsRes.data || [];
+        allChannels = rawChannels.map(c => ({
+            name: c.name || 'Unknown Channel',
+            url: c.link || c.url || '#'
+        }));
         allEvents.sort((a, b) => a.unix_timestamp - b.unix_timestamp);
 
         populateFilters();
@@ -218,14 +222,19 @@ window.openChannel = function (url, info, btn, event) {
     
     pSec.style.display = 'block';
     
-    // If the URL is just a name or a relative path, construct the full topembed URL
-    let finalUrl = url;
-    if (!url.startsWith('http')) {
-        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(url.replace('/channel/', ''));
-    } else if (url.includes('topembed.pw/channel/')) {
-        finalUrl = url;
+    let finalUrl = '';
+    
+    // The user wants the format: https://topembed.pw/channel/ChannelName
+    // If info contains ' vs ', it's an event, and 'url' is the channel link.
+    // If info does NOT contain ' vs ', it's a TV channel, and 'info' is the channel name.
+    
+    if (info.includes(' vs ')) {
+        // Event channel: use the link provided in 'url'
+        let channelParam = url.replace('/channel/', '');
+        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(channelParam);
     } else {
-        finalUrl = url;
+        // TV channel: use the channel name provided in 'info'
+        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(info);
     }
 
     mPl.src = finalUrl;
