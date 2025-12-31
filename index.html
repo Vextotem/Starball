@@ -440,12 +440,10 @@ body {
 </head>
 <body>
 
-    <a href="/" style="text-decoration: none; color: inherit;">
-        <div class="header" id="main-header">
-            <h1>Sports Events Live</h1>
-            <p>Live streaming schedules • High Quality Streams</p>
-        </div>
-    </a>
+    <div class="header" id="main-header" style="cursor: pointer;" onclick="location.reload()">
+        <h1>Sports Events Live</h1>
+        <p>Live streaming schedules • High Quality Streams</p>
+    </div>
 
     <div class="container">
         
@@ -629,7 +627,7 @@ function displayEvents(events, container) {
         card.className = `event-card ${isLive ? 'live-event' : ''}`;
         
         const channelButtons = event.channels.map(c => 
-            `<button class="channel-link" onclick="openChannel('${escapeHtml(c.url)}', '${escapeHtml(event.home_team + ' vs ' + event.away_team)}', this)">${escapeHtml(c.name)}</button>`
+            `<button class="channel-link" onclick="openChannel('${escapeHtml(c.url)}', '${escapeHtml(event.home_team + ' vs ' + event.away_team)}', this, event)">${escapeHtml(c.name)}</button>`
         ).join('');
 
         const timeString = new Date(event.unix_timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -675,7 +673,7 @@ function displayChannels(channels, container) {
         const url = channel.url || channel.link || '#'; 
         const name = channel.name || "Unknown Channel";
         btn.innerHTML = `<span>${escapeHtml(name)}</span>`;
-        btn.onclick = (e) => openChannel(url, name, e.target);
+        btn.onclick = (e) => openChannel(url, name, e.target, e);
         grid.appendChild(btn);
     });
     container.appendChild(grid);
@@ -704,7 +702,11 @@ function updateStats(count, label) {
     if (stats) stats.innerHTML = `<div class="stat-item"><div class="stat-value">${count}</div><div class="stat-label">${label}</div></div>`;
 }
 
-window.openChannel = function (url, info, btn) {
+window.openChannel = function (url, info, btn, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     const pSec = document.getElementById('player-section');
     const mPl = document.getElementById('main-player');
     const cCh = document.getElementById('current-channel');
@@ -713,7 +715,7 @@ window.openChannel = function (url, info, btn) {
     mPl.src = url;
     if(cCh) cCh.textContent = info;
     if (activeChannelButton) activeChannelButton.classList.remove('active');
-    const actualBtn = btn.tagName === 'BUTTON' ? btn : btn.closest('button');
+    const actualBtn = btn && btn.tagName === 'BUTTON' ? btn : (btn ? btn.closest('button') : null);
     if (actualBtn) { actualBtn.classList.add('active'); activeChannelButton = actualBtn; }
     window.scrollTo({top: 0, behavior: 'smooth'});
     updateHeader(true);
@@ -747,3 +749,4 @@ function escapeHtml(text) {
     </script>
 </body>
 </html>
+
