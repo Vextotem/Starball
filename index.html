@@ -711,8 +711,31 @@ window.openChannel = function (url, info, btn, event) {
     const mPl = document.getElementById('main-player');
     const cCh = document.getElementById('current-channel');
     if (!pSec || !mPl) return;
+    
+    // Extract channel name from URL or use info
+    // The user wants the format: https://topembed.pw/channel/ChannelName
+    let channelName = info;
+    if (info.includes(' vs ')) {
+        // If it's an event, we might need to handle it differently, 
+        // but based on the provided example, it's /channel/ChannelName
+        // For now, let's assume the 'url' passed is what we should use if it's already a full URL,
+        // otherwise construct it.
+    }
+
     pSec.style.display = 'block';
-    mPl.src = url;
+    
+    // If the URL is just a name or a relative path, construct the full topembed URL
+    let finalUrl = url;
+    if (!url.startsWith('http')) {
+        finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(url.replace('/channel/', ''));
+    } else if (url.includes('topembed.pw/channel/')) {
+        finalUrl = url;
+    } else {
+        // If it's a different domain, we keep it as is or wrap it if needed
+        finalUrl = url;
+    }
+
+    mPl.src = finalUrl;
     if(cCh) cCh.textContent = info;
     if (activeChannelButton) activeChannelButton.classList.remove('active');
     const actualBtn = btn && btn.tagName === 'BUTTON' ? btn : (btn ? btn.closest('button') : null);
