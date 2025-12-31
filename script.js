@@ -1,11 +1,15 @@
-const apiUrl = 'https://topembed.pw/api.php?format=json';
+/* =======================
+   API CONFIG
+   ======================= */
+const EVENTS_API = 'https://beta.adstrim.ru/api/events';
+const CHANNELS_API = 'https://beta.adstrim.ru/api/channels';
+
 let allEvents = [];
-let filterTimeout;
 let activeChannelButton = null;
 const LIVE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours
 
 /* =======================
-   FOOTBALL PRIORITY SETUP
+   FOOTBALL PRIORITY
    ======================= */
 const PRIORITY_SPORT = 'Football';
 
@@ -25,11 +29,11 @@ const POPULAR_FOOTBALL_LEAGUES = [
 ];
 
 /* =======================
-   DATE FORMAT
+   DATE
    ======================= */
 function getFormattedLocalDate() {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /* =======================
@@ -68,87 +72,111 @@ function getUrlParameter(name) {
 }
 
 /* =======================
-   DATA LOADING
+   LOAD DATA
    ======================= */
 async function loadData() {
     const eventsContainer = document.getElementById('events');
     eventsContainer.innerHTML = '<div class="no-results">Loading events...</div>';
 
     try {
-        const data = await fetch(apiUrl, { mode: 'cors', credentials: 'omit' }).then(r => r.json());
-        processData(data);
-    } catch {
+        const [eventsRes, channelsRes] = await Promise.all([
+            fetch(EVENTS_API),
+            fetch(CHANNELS_API)
+        ]);
+
+        const eventsJson = await eventsRes.json();
+        const channelsJson = await channelsRes.json();
+
+        if (eventsJson.status !== 'success') {
+            throw new Error('Events API failed');
+        }
+
+        processData(eventsJson.data, channelsJson.data || []);
+    } catch (err) {
+        console.error(err);
         eventsContainer.innerHTML = '<div class="no-results">Error loading data.</div>';
     }
 }
 
 /* =======================
-   PROCESS & SORT DATA
+   PROCESS DATA
    ======================= */
-function processData(data) {
+function processData(events, channels) {
     allEvents = [];
 
-    for (const [date, events] of Object.entries(data.events)) {
-        events.forEach(event => allEvents.push({ ...event, date }));
-    }
+    const channelMap = {};
+    channels.forEach(c => {
+        if (!channelMap[c.event_id]) channelMap[c.event_id] = [];
+        channelMap[c.event_id].push(c.stream_url);
+    });
 
+    events.forEach(e => {
+        allEvents.push({
+            id: e.id,
+            sport: e.sport_name,
+            tournament: e.league_name,
+            match: `${e.home_team} vs ${e.away_team}`,
+            unix_timestamp: e.start_time,
+            channels: channelMap[e.id] || []
+        });
+    });
+
+    sortEvents();
+    populateFilters();
+    applyUrlFilters();
+}
+
+/* =======================
+   SORT EVENTS
+   ======================= */
+function sortEvents() {
     const now = Date.now() / 1000;
 
     allEvents.sort((a, b) => {
-        const aIsLive = a.unix_timestamp <= now && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
-        const bIsLive = b.unix_timestamp <= now && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
+        const aLive = a.unix_timestamp <= now && now - a.unix_timestamp < LIVE_DURATION_SECONDS;
+        const bLive = b.unix_timestamp <= now && now - b.unix_timestamp < LIVE_DURATION_SECONDS;
 
-        const aIsFootball = a.sport === PRIORITY_SPORT;
-        const bIsFootball = b.sport === PRIORITY_SPORT;
+        const aFoot = a.sport === PRIORITY_SPORT;
+        const bFoot = b.sport === PRIORITY_SPORT;
 
-        const aPopular = aIsFootball && POPULAR_FOOTBALL_LEAGUES.some(l =>
-            a.tournament.toLowerCase().includes(l.toLowerCase())
-        );
-        const bPopular = bIsFootball && POPULAR_FOOTBALL_LEAGUES.some(l =>
-            b.tournament.toLowerCase().includes(l.toLowerCase())
-        );
+        const aPop = aFoot && POPULAR_FOOTBALL_LEAGUES.some(l => a.tournament.toLowerCase().includes(l.toLowerCase()));
+        const bPop = bFoot && POPULAR_FOOTBALL_LEAGUES.some(l => b.tournament.toLowerCase().includes(l.toLowerCase()));
 
-        /* LIVE first */
-        if (aIsLive && !bIsLive) return -1;
-        if (!aIsLive && bIsLive) return 1;
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
 
-        /* LIVE football first */
-        if (aIsLive && bIsLive) {
-            if (aIsFootball && !bIsFootball) return -1;
-            if (!aIsFootball && bIsFootball) return 1;
-
-            if (aPopular && !bPopular) return -1;
-            if (!aPopular && bPopular) return 1;
-
+        if (aLive && bLive) {
+            if (aFoot && !bFoot) return -1;
+            if (!aFoot && bFoot) return 1;
+            if (aPop && !bPop) return -1;
+            if (!aPop && bPop) return 1;
             return b.unix_timestamp - a.unix_timestamp;
         }
 
-        /* Upcoming football first */
-        if (aIsFootball && !bIsFootball) return -1;
-        if (!aIsFootball && bIsFootball) return 1;
-
-        if (aPopular && !bPopular) return -1;
-        if (!aPopular && bPopular) return 1;
+        if (aFoot && !bFoot) return -1;
+        if (!aFoot && bFoot) return 1;
+        if (aPop && !bPop) return -1;
+        if (!aPop && bPop) return 1;
 
         return a.unix_timestamp - b.unix_timestamp;
     });
-
-    populateFilters();
-    applyUrlFilters();
 }
 
 /* =======================
    FILTERS
    ======================= */
 function populateFilters() {
-    const sports = [...new Set(allEvents.map(e => e.sport))].sort();
-    const tournaments = [...new Set(allEvents.map(e => e.tournament))].sort();
-
     const sportFilter = document.getElementById('sportFilter');
     const tournamentFilter = document.getElementById('tournamentFilter');
 
-    sports.forEach(s => sportFilter.append(new Option(s, s)));
-    tournaments.forEach(t => tournamentFilter.append(new Option(t, t)));
+    sportFilter.innerHTML = '<option value="">All Sports</option>';
+    tournamentFilter.innerHTML = '<option value="">All Tournaments</option>';
+
+    [...new Set(allEvents.map(e => e.sport))].sort()
+        .forEach(s => sportFilter.append(new Option(s, s)));
+
+    [...new Set(allEvents.map(e => e.tournament))].sort()
+        .forEach(t => tournamentFilter.append(new Option(t, t)));
 }
 
 function applyUrlFilters() {
@@ -177,10 +205,7 @@ function filterEvents() {
    DISPLAY
    ======================= */
 function formatTime(ts) {
-    return new Date(ts * 1000).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    return new Date(ts * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 function displayEvents(events) {
@@ -194,8 +219,8 @@ function displayEvents(events) {
 
     const now = Date.now() / 1000;
 
-    events.forEach(event => {
-        const isLive = event.unix_timestamp <= now && (now - event.unix_timestamp < LIVE_DURATION_SECONDS);
+    events.forEach(e => {
+        const isLive = e.unix_timestamp <= now && now - e.unix_timestamp < LIVE_DURATION_SECONDS;
 
         const card = document.createElement('div');
         card.className = `event-card ${isLive ? 'live-event' : ''}`;
@@ -203,18 +228,21 @@ function displayEvents(events) {
         card.innerHTML = `
             <div class="event-header">
                 <div>
-                    <div class="match-name">${event.match} ${isLive ? '<span class="live-badge">LIVE</span>' : ''}</div>
-                    <div class="tournament-name">${event.tournament}</div>
+                    <div class="match-name">${e.match} ${isLive ? '<span class="live-badge">LIVE</span>' : ''}</div>
+                    <div class="tournament-name">${e.tournament}</div>
                 </div>
                 <div>
-                    <span class="sport-badge">${event.sport}</span>
-                    <span class="time-badge">${formatTime(event.unix_timestamp)}</span>
+                    <span class="sport-badge">${e.sport}</span>
+                    <span class="time-badge">${formatTime(e.unix_timestamp)}</span>
                 </div>
             </div>
             <div class="channels">
-                ${event.channels.map((c, i) =>
-                    `<button class="channel-link" onclick="openChannel('${c}','Stream ${i + 1} - ${event.match}',this)">Stream ${i + 1}</button>`
-                ).join('')}
+                ${e.channels.length
+                    ? e.channels.map((c, i) =>
+                        `<button class="channel-link" onclick="openChannel('${c}','Stream ${i + 1} - ${e.match}',this)">Stream ${i + 1}</button>`
+                      ).join('')
+                    : '<span class="no-channels">No streams available</span>'
+                }
             </div>
         `;
 
@@ -227,9 +255,9 @@ function displayEvents(events) {
    ======================= */
 function updateStats(events) {
     stats.innerHTML = `
-        <div class="stat-item"><div class="stat-value">${events.length}</div><div class="stat-label">Total Events</div></div>
+        <div class="stat-item"><div class="stat-value">${events.length}</div><div class="stat-label">Events</div></div>
         <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.sport)).size}</div><div class="stat-label">Sports</div></div>
-        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.tournament)).size}</div><div class="stat-label">Tournaments</div></div>
+        <div class="stat-item"><div class="stat-value">${new Set(events.map(e => e.tournament)).size}</div><div class="stat-label">Leagues</div></div>
     `;
 }
 
@@ -237,9 +265,9 @@ function updateStats(events) {
    PLAYER
    ======================= */
 window.openChannel = function (url, info, btn) {
-    player-section.style.display = 'block';
-    main-player.src = url;
-    current-channel.textContent = info;
+    document.getElementById('player-section').style.display = 'block';
+    document.getElementById('main-player').src = url;
+    document.getElementById('current-channel').textContent = info;
 
     activeChannelButton?.classList.remove('active');
     btn.classList.add('active');
@@ -249,8 +277,8 @@ window.openChannel = function (url, info, btn) {
 };
 
 window.closePlayer = function () {
-    player-section.style.display = 'none';
-    main-player.src = '';
+    document.getElementById('player-section').style.display = 'none';
+    document.getElementById('main-player').src = '';
     activeChannelButton?.classList.remove('active');
     activeChannelButton = null;
     updateHeader(false);
