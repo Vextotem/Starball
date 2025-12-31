@@ -56,7 +56,11 @@ async function loadData() {
                 .filter(event => event.unix_timestamp > CUTOFF_TIME);
         }
 
-        allChannels = channelsRes.channels || channelsRes.data || [];
+        const rawChannels = channelsRes.channels || channelsRes.data || [];
+        allChannels = rawChannels.map(c => ({
+            name: c.name || 'Unknown Channel',
+            url: c.link || c.url || '#'
+        }));
         allEvents.sort((a, b) => a.unix_timestamp - b.unix_timestamp);
 
         populateFilters();
