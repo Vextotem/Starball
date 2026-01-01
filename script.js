@@ -47,6 +47,7 @@ async function loadData() {
             fetch(`${BASE_URL}/channels`).then(r => r.json())
         ]);
 
+        // Assign sequential names to channels in events
         allEvents = [];
         if (eventsRes.data && Array.isArray(eventsRes.data)) {
             allEvents = eventsRes.data.map(item => ({
@@ -60,15 +61,16 @@ async function loadData() {
                 sport: item.sport || 'Sports',
                 unix_timestamp: item.timestamp || 0,
                 channels: (item.channels || []).map((c, index) => ({
-                    name: `Stream ${index + 1}`, // <-- Sequential stream naming
+                    name: `Stream ${index + 1}`, // Sequential stream names
                     url: c.link || '#'
                 }))
             }));
         }
 
+        // Assign sequential names to global channels
         const rawChannels = channelsRes.channels || channelsRes.data || [];
         allChannels = rawChannels.map((c, index) => ({
-            name: `Stream ${index + 1}`, // sequential naming for global channels
+            name: `Stream ${index + 1}`,
             url: c.link || c.url || '#'
         }));
 
@@ -261,6 +263,7 @@ function updateStats(count, label) {
     if (stats) stats.innerHTML = `<div class="stat-item"><div class="stat-value">${count}</div><div class="stat-label">${label}</div></div>`;
 }
 
+// Fully corrected player function
 window.openChannel = function (url, info, btn, event) {
     if (event) {
         event.preventDefault();
@@ -272,20 +275,17 @@ window.openChannel = function (url, info, btn, event) {
     if (!pSec || !mPl) return;
     
     pSec.style.display = 'block';
-    
-    let channelName = info;
-    
-    if (info.includes(' vs ')) {
-        channelName = btn.textContent || btn.innerText;
-    }
 
-    const finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(channelName.trim());
+    // Use actual URL from API
+    mPl.src = url;
 
-    mPl.src = finalUrl;
+    // Display match info
     if(cCh) cCh.textContent = info;
+
     if (activeChannelButton) activeChannelButton.classList.remove('active');
     const actualBtn = btn && btn.tagName === 'BUTTON' ? btn : (btn ? btn.closest('button') : null);
     if (actualBtn) { actualBtn.classList.add('active'); activeChannelButton = actualBtn; }
+
     window.scrollTo({top: 0, behavior: 'smooth'});
     updateHeader(true);
 };
