@@ -1,3 +1,4 @@
+
 const BASE_URL = 'https://beta.adstrim.ru/api';
 let allEvents = [];
 let allChannels = [];
@@ -47,9 +48,9 @@ async function loadData() {
             fetch(`${BASE_URL}/channels`).then(r => r.json())
         ]);
 
-        // Assign sequential names to channels in events
         allEvents = [];
         if (eventsRes.data && Array.isArray(eventsRes.data)) {
+            // Display ALL events from the API without any filtering
             allEvents = eventsRes.data.map(item => ({
                 id: item.id || '',
                 home_team: item.home_team || 'Unknown',
@@ -60,17 +61,16 @@ async function loadData() {
                 tournament: item.league || 'General',
                 sport: item.sport || 'Sports',
                 unix_timestamp: item.timestamp || 0,
-                channels: (item.channels || []).map((c, index) => ({
-                    name: `Stream ${index + 1}`, // Sequential stream names
+                channels: (item.channels || []).map(c => ({
+                    name: c.name || 'Stream',
                     url: c.link || '#'
                 }))
             }));
         }
 
-        // Assign sequential names to global channels
         const rawChannels = channelsRes.channels || channelsRes.data || [];
-        allChannels = rawChannels.map((c, index) => ({
-            name: `Stream ${index + 1}`,
+        allChannels = rawChannels.map(c => ({
+            name: c.name || 'Unknown Channel',
             url: c.link || c.url || '#'
         }));
 
@@ -90,15 +90,18 @@ function sortEventsByPriority(events) {
         const aIsLive = a.unix_timestamp <= now && (now - a.unix_timestamp < LIVE_DURATION_SECONDS);
         const bIsLive = b.unix_timestamp <= now && (now - b.unix_timestamp < LIVE_DURATION_SECONDS);
         
+        // Priority 1: Live events first
         if (aIsLive && !bIsLive) return -1;
         if (!aIsLive && bIsLive) return 1;
         
+        // Priority 2: Football/Soccer
         const aIsFootball = a.sport.toLowerCase().includes('football') || a.sport.toLowerCase().includes('soccer');
         const bIsFootball = b.sport.toLowerCase().includes('football') || b.sport.toLowerCase().includes('soccer');
         
         if (aIsFootball && !bIsFootball) return -1;
         if (!aIsFootball && bIsFootball) return 1;
         
+        // Priority 3: Popular leagues (if both are football)
         if (aIsFootball && bIsFootball) {
             const aIsPopular = POPULAR_LEAGUES.some(league => 
                 a.tournament.toLowerCase().includes(league)
@@ -111,6 +114,7 @@ function sortEventsByPriority(events) {
             if (!aIsPopular && bIsPopular) return 1;
         }
         
+        // Priority 4: Time (earlier first)
         return a.unix_timestamp - b.unix_timestamp;
     });
 }
@@ -263,7 +267,6 @@ function updateStats(count, label) {
     if (stats) stats.innerHTML = `<div class="stat-item"><div class="stat-value">${count}</div><div class="stat-label">${label}</div></div>`;
 }
 
-// Fully corrected player function
 window.openChannel = function (url, info, btn, event) {
     if (event) {
         event.preventDefault();
@@ -275,17 +278,20 @@ window.openChannel = function (url, info, btn, event) {
     if (!pSec || !mPl) return;
     
     pSec.style.display = 'block';
+    
+    let channelName = info;
+    
+    if (info.includes(' vs ')) {
+        channelName = btn.textContent || btn.innerText;
+    }
 
-    // Use actual URL from API
-    mPl.src = url;
+    const finalUrl = 'https://topembed.pw/channel/' + encodeURIComponent(channelName.trim());
 
-    // Display match info
+    mPl.src = finalUrl;
     if(cCh) cCh.textContent = info;
-
     if (activeChannelButton) activeChannelButton.classList.remove('active');
     const actualBtn = btn && btn.tagName === 'BUTTON' ? btn : (btn ? btn.closest('button') : null);
     if (actualBtn) { actualBtn.classList.add('active'); activeChannelButton = actualBtn; }
-
     window.scrollTo({top: 0, behavior: 'smooth'});
     updateHeader(true);
 };
