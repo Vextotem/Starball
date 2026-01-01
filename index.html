@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Raket Sports</title>
-    <link rel="icon" href="https://cdn.jsdelivr.net/gh/Vextotem/Mycss@main/raketlogo.png" type="image/x-icon">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raket Sports</title>
+<link rel="icon" href="https://cdn.jsdelivr.net/gh/Vextotem/Mycss@main/raketlogo.png">
 
 <style>
-/* ===== BASE ===== */
 *{margin:0;padding:0;box-sizing:border-box}
 body{
-    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
+    font-family:Segoe UI,Tahoma,Verdana,sans-serif;
     background:linear-gradient(135deg,#1a1a2e,#16213e);
     padding:10px;
     min-height:100vh
@@ -20,47 +19,44 @@ body{
     margin:auto;
     background:#fff;
     border-radius:15px;
-    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
     overflow:hidden
 }
 .header{
     background:linear-gradient(135deg,#667eea,#764ba2);
     color:#fff;
-    padding:30px;
+    padding:25px;
     text-align:center;
     cursor:pointer
 }
-.header h1{font-size:2.2em}
-
-/* ===== FILTERS ===== */
 .filters{
-    padding:20px 30px;
+    padding:20px;
     background:#f8f9fa;
-    border-bottom:2px solid #e9ecef
+    border-bottom:1px solid #dee2e6
 }
-.filter-row{display:flex;gap:10px;flex-wrap:wrap}
-.filter-group{flex:1;min-width:200px}
-.filter-group label{font-weight:600;margin-bottom:6px;display:block}
-.filter-group select,
-.filter-group input{
+.filters input{
     width:100%;
     padding:12px;
     border:2px solid #dee2e6;
     border-radius:8px
 }
+.events{padding:25px}
 
-/* ===== EVENTS ===== */
-.events{padding:30px}
 .event-card{
     border:1px solid #e9ecef;
     border-radius:12px;
-    padding:20px;
-    margin-bottom:15px;
+    padding:18px;
+    margin-bottom:14px;
     transition:.2s
 }
-.event-card.live{border-left:5px solid #ff4444;background:#fffafa}
-.event-card:hover{border-color:#667eea;transform:translateX(5px)}
-
+.event-card.live{
+    border-left:5px solid #ff4444;
+    background:#fff6f6
+}
+.event-card:hover{
+    border-color:#667eea;
+    transform:translateX(4px)
+}
 .event-header{
     display:flex;
     justify-content:space-between;
@@ -70,11 +66,11 @@ body{
 .match{
     display:flex;
     align-items:center;
-    gap:15px
+    gap:12px
 }
 .league-logo{width:40px;height:40px;object-fit:contain}
 .team-logo{width:26px;height:26px;object-fit:contain}
-.teams{font-size:1.2em;font-weight:700}
+.teams{font-weight:700;font-size:1.1em}
 .vs{color:#aaa;margin:0 6px}
 .tournament{font-size:.9em;color:#666}
 .badge{
@@ -88,19 +84,24 @@ body{
 .badge.sport{background:#667eea}
 .badge.time{background:#28a745}
 
-/* ===== CHANNELS ===== */
-.channels{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
+.channels{
+    margin-top:12px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap
+}
 .channel-btn{
-    padding:10px 18px;
+    padding:9px 16px;
     border-radius:6px;
     border:1px solid #ced4da;
     background:#f1f3f5;
     font-weight:600;
     cursor:pointer
 }
-.channel-btn:hover{background:#764ba2;color:#fff}
-
-/* ===== STATES ===== */
+.channel-btn:hover{
+    background:#764ba2;
+    color:#fff
+}
 .loading,.no-results{
     text-align:center;
     padding:50px;
@@ -113,18 +114,13 @@ body{
 
 <div class="header" onclick="location.reload()">
     <h1>Sports Events Live</h1>
-    <p>Live • Football Priority • Premier League Focus</p>
+    <p>Live • Football Priority • Local Timezone</p>
 </div>
 
 <div class="container">
 
 <div class="filters">
-    <div class="filter-row">
-        <div class="filter-group">
-            <label>Search</label>
-            <input id="searchFilter" placeholder="Teams or league">
-        </div>
-    </div>
+    <input id="searchFilter" placeholder="Search teams or league">
 </div>
 
 <div class="events" id="events"></div>
@@ -132,55 +128,61 @@ body{
 </div>
 
 <script>
-const BASE_URL = 'https://beta.adstrim.ru/api';
+const API_URL = 'https://beta.adstrim.ru/api/events';
 const LIVE_DURATION_SECONDS = 3 * 60 * 60;
+const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 let allEvents = [];
 
-/* ===== LIVE DETECTION ===== */
+/* ===== LIVE CHECK (UTC SAFE) ===== */
 function isLive(ts){
-    const now = Math.floor(Date.now()/1000);
-    return ts>0 && ts<=now && (now-ts)<=LIVE_DURATION_SECONDS;
+    const now = Math.floor(Date.now() / 1000);
+    return ts > 0 && ts <= now && (now - ts) <= LIVE_DURATION_SECONDS;
 }
 
-/* ===== SORT PRIORITY ===== */
+/* ===== PRIORITY SORT ===== */
 function sortEvents(events){
-    const TOP_LEAGUES=[
+    const TOP_LEAGUES = [
         'premier league','champions league','europa league',
         'la liga','serie a','bundesliga','ligue 1'
     ];
 
     return [...events].sort((a,b)=>{
-        const al=isLive(a.ts), bl=isLive(b.ts);
-        if(al!==bl) return al?-1:1;
+        const al = isLive(a.ts), bl = isLive(b.ts);
+        if(al !== bl) return al ? -1 : 1;
 
-        const af=/football|soccer/i.test(a.sport);
-        const bf=/football|soccer/i.test(b.sport);
-        if(af!==bf) return af?-1:1;
+        const af = /football|soccer/i.test(a.sport);
+        const bf = /football|soccer/i.test(b.sport);
+        if(af !== bf) return af ? -1 : 1;
 
-        const at=TOP_LEAGUES.some(l=>a.league.toLowerCase().includes(l));
-        const bt=TOP_LEAGUES.some(l=>b.league.toLowerCase().includes(l));
-        if(at!==bt) return at?-1:1;
+        const at = TOP_LEAGUES.some(l => a.league.toLowerCase().includes(l));
+        const bt = TOP_LEAGUES.some(l => b.league.toLowerCase().includes(l));
+        if(at !== bt) return at ? -1 : 1;
 
-        return (a.ts||Infinity)-(b.ts||Infinity);
+        return (a.ts || Infinity) - (b.ts || Infinity);
     });
 }
 
-/* ===== LOAD API ===== */
+/* ===== LOAD EVENTS ===== */
 async function load(){
-    const el=document.getElementById('events');
-    el.innerHTML='<div class="loading">Loading events...</div>';
+    const container = document.getElementById('events');
+    container.innerHTML = '<div class="loading">Loading events...</div>';
 
-    const res=await fetch(`${BASE_URL}/events`).then(r=>r.json());
-    allEvents=(res.data||[]).map(e=>({
-        home:e.home_team||'Unknown',
-        away:e.away_team||'Unknown',
-        hLogo:e.home_team_image||'',
-        aLogo:e.away_team_image||'',
-        league:e.league||'General',
-        lLogo:e.league_image||'',
-        sport:e.sport||'Sports',
-        ts:Number(e.timestamp)||0,
-        channels:(e.channels||[]).map(c=>({name:c.name, url:c.link}))
+    const res = await fetch(API_URL).then(r => r.json());
+
+    allEvents = (res.data || []).map(e => ({
+        home: e.home_team || 'Unknown',
+        away: e.away_team || 'Unknown',
+        hLogo: e.home_team_image || '',
+        aLogo: e.away_team_image || '',
+        league: e.league || 'General',
+        lLogo: e.league_image || '',
+        sport: e.sport || 'Sports',
+        ts: Number(e.timestamp) || 0,
+        channels: (e.channels || []).map(c => ({
+            name: c.name || 'Stream',
+            url: c.link || '#'
+        }))
     }));
 
     render();
@@ -188,27 +190,32 @@ async function load(){
 
 /* ===== RENDER ===== */
 function render(){
-    const q=document.getElementById('searchFilter').value.toLowerCase();
-    const list=sortEvents(allEvents.filter(e=>
-        `${e.home} ${e.away} ${e.league}`.toLowerCase().includes(q)
-    ));
+    const q = document.getElementById('searchFilter').value.toLowerCase();
 
-    const el=document.getElementById('events');
-    el.innerHTML='';
+    const list = sortEvents(
+        allEvents.filter(e =>
+            `${e.home} ${e.away} ${e.league}`.toLowerCase().includes(q)
+        )
+    );
+
+    const el = document.getElementById('events');
+    el.innerHTML = '';
 
     if(!list.length){
-        el.innerHTML='<div class="no-results">No events found</div>';
+        el.innerHTML = '<div class="no-results">No events found</div>';
         return;
     }
 
     list.forEach(e=>{
-        const live=isLive(e.ts);
-        const time=new Date(e.ts*1000).toLocaleTimeString([],{
-            hour:'2-digit',minute:'2-digit'
+        const live = isLive(e.ts);
+        const time = new Date(e.ts * 1000).toLocaleTimeString(undefined,{
+            hour:'2-digit',
+            minute:'2-digit',
+            timeZone: USER_TIMEZONE
         });
 
-        el.innerHTML+=`
-        <div class="event-card ${live?'live':''}">
+        el.innerHTML += `
+        <div class="event-card ${live ? 'live' : ''}">
             <div class="event-header">
                 <div class="match">
                     <img src="${e.lLogo}" class="league-logo">
@@ -217,7 +224,7 @@ function render(){
                             <img src="${e.hLogo}" class="team-logo">
                             ${e.home}<span class="vs">vs</span>${e.away}
                             <img src="${e.aLogo}" class="team-logo">
-                            ${live?'<span class="badge live">LIVE</span>':''}
+                            ${live ? '<span class="badge live">LIVE</span>' : ''}
                         </div>
                         <div class="tournament">${e.league}</div>
                     </div>
@@ -228,7 +235,7 @@ function render(){
                 </div>
             </div>
             <div class="channels">
-                ${e.channels.map(c=>`
+                ${e.channels.map(c => `
                     <button class="channel-btn">${c.name}</button>
                 `).join('')}
             </div>
@@ -236,7 +243,7 @@ function render(){
     });
 }
 
-document.getElementById('searchFilter').addEventListener('input',render);
+document.getElementById('searchFilter').addEventListener('input', render);
 load();
 </script>
 
