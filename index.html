@@ -2,24 +2,42 @@
 <html lang="en">
 <head>
     <!-- Ads -->
-<script data-cfasync="false">
-(function () {
-    var popScripts = [
-        "//cv.chelaology.com/r18M0zSrxTiFLDp/129065",
-        "//lo.synedawtit.com/rSqP4sjxHP4JkuM/104823"
-    ];
+   <div id="ad-container"></div>
 
-    var chosen = popScripts[Math.floor(Math.random() * popScripts.length)];
+    <script>
+        // Ad rotation script
+        (function() {
+            // Define your ad scripts
+            const adScripts = [
+                {
+                    src: '//gd.gumtreegravedo.com/rOd6tKOXJJ4Yd/104823',
+                    async: true,
+                    dataCfasync: 'false'
+                },
+                {
+                    src: '//dcbbwymp1bhlf.cloudfront.net/?wbbcd=1118835',
+                    async: false,
+                    dataCfasync: 'false'
+                }
+            ];
 
-    var s = document.createElement("script");
-    s.type = "text/javascript";
-    s.async = true;
-    s.src = chosen;
-    s.setAttribute("data-cfasync", "false");
+            // Randomly select one ad script
+            const randomAd = adScripts[Math.floor(Math.random() * adScripts.length)];
 
-    document.body.appendChild(s);
-})();
-</script>
+            // Create and insert the script element
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = randomAd.src;
+            script.setAttribute('data-cfasync', randomAd.dataCfasync);
+            
+            if (randomAd.async) {
+                script.async = true;
+            }
+
+            // Append to ad container or body
+            document.getElementById('ad-container').appendChild(script);
+        })();
+    </script>
 
 <!-- Ads -->
 <script data-cfasync="false" async type="text/javascript" src="//tooledundon.com/gpqSrwtbdnqGNc/97239"></script>
