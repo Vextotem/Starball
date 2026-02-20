@@ -1,27 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-   
 <head>
-   <!-- Ads -->
-  <script src="https://warshardnessmotivation.com/23/f9/2b/23f92b9dd93b490d015075535f7cbbcf.js"></script>
-   <!-- Ads -->
-   <!-- Ad -->
-   <script data-cfasync="false" async type="text/javascript" src="//coylycaptate.com/gfYixaOxSzN05Q/97239"></script>
-   <!-- Ad -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Raket Sports</title>
+    <title>Raket Sports – Live Matches & TV Channels</title>
+    <meta name="description" content="Watch live sports events and TV channels with updated schedules and high quality streams.">
     <link rel="icon" href="https://cdn.jsdelivr.net/gh/Vextotem/Mycss@main/raketlogo.png" type="image/x-icon">
     <link rel="stylesheet" href="styles.css">
+
+    <!-- Ads -->
+    <script async src="https://warshardnessmotivation.com/23/f9/2b/23f92b9dd93b490d015075535f7cbbcf.js"></script>
+    <script async data-cfasync="false" src="//coylycaptate.com/gfYixaOxSzN05Q/97239"></script>
 </head>
+
 <body>
-    <div class="header" id="main-header" style="cursor: pointer;" onclick="location.reload()">
+
+    <header class="header" id="main-header">
         <h1>Sports Events Live</h1>
         <p>Live streaming schedules • High Quality Streams</p>
-    </div>
+    </header>
 
     <div class="container">
-        <div id="player-section" class="player-section" style="display:none;">
+
+        <!-- PLAYER SECTION -->
+        <section id="player-section" class="player-section" style="display:none;">
             <div class="player-header">
                 <div class="now-playing">
                     <span class="now-playing-label">▶ NOW PLAYING:</span>
@@ -29,108 +31,89 @@
                 </div>
                 <button class="close-player-btn" onclick="closePlayer()">✕ Close</button>
             </div>
+
             <div class="player-wrapper">
-                <iframe id="main-player" class="main-iframe" frameborder="0" allowfullscreen></iframe>
+                <iframe 
+                    id="main-player"
+                    class="main-iframe"
+                    frameborder="0"
+                    allowfullscreen
+                    allow="autoplay; encrypted-media"
+                    loading="lazy">
+                </iframe>
             </div>
-            <center><script>
-  atOptions = {
-    'key' : '432208a4b61ab681c09ab68fe06004de',
-    'format' : 'iframe',
-    'height' : 50,
-    'width' : 320,
-    'params' : {}
-  };
-</script>
-<script src="https://warshardnessmotivation.com/432208a4b61ab681c09ab68fe06004de/invoke.js"></script></center>
-<!-- Ads -->
-<div style="display:flex; justify-content:center; margin:20px 0;">
-    <a href="https://cp.yottasrc.com/aff.php?aff=31" target="_blank"
-       style="width:320px; height:50px; background-color:#007BFF; border-radius:5px;
-              display:flex; align-items:center; justify-content:space-between;
-              padding:0 10px; box-shadow:0 2px 4px rgba(0,0,0,0.1);
-              font-family:Arial, sans-serif; color:white; text-decoration:none;">
-        
-        <div style="flex:1; text-align:left;">
-            <span style="font-size:14px; font-weight:bold;">CHEAP VPS AT YOTTA</span>
-            <span style="font-size:12px; display:block;">Get $1 VPS NOW</span>
-        </div>
 
-        <div style="background-color:#FFD700; color:#007BFF; padding:5px 10px;
-                    border-radius:3px; font-size:12px; font-weight:bold;">
-            Sign Up
-        </div>
+            <!-- Banner Ad -->
+            <div style="display:flex; justify-content:center; margin:20px 0;">
+                <a href="https://cp.yottasrc.com/aff.php?aff=31" target="_blank"
+                   style="width:320px;height:50px;background:#007BFF;border-radius:5px;
+                          display:flex;align-items:center;justify-content:space-between;
+                          padding:0 10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);
+                          font-family:Arial,sans-serif;color:white;text-decoration:none;">
+                    <div>
+                        <strong style="font-size:14px;">CHEAP VPS AT YOTTA</strong>
+                        <span style="font-size:12px;display:block;">Get $1 VPS NOW</span>
+                    </div>
+                    <div style="background:#FFD700;color:#007BFF;padding:5px 10px;
+                                border-radius:3px;font-size:12px;font-weight:bold;">
+                        Sign Up
+                    </div>
+                </a>
+            </div>
 
-    </a>
-</div>
-<!-- Ads -->
+            <!-- Chat -->
             <div class="chat-container">
-                <iframe src="https://www5.cbox.ws/box/?boxid=959364&boxtag=sPnB5y" class="chat-iframe" height="190"></iframe>
+                <iframe 
+                    src="https://www5.cbox.ws/box/?boxid=959364&boxtag=sPnB5y"
+                    class="chat-iframe"
+                    height="190"
+                    loading="lazy">
+                </iframe>
             </div>
+
+            <!-- Social Buttons -->
             <div class="social-buttons-container">
                 <a href="https://t.me/addlist/qpMuSt4AcIc1NzJh" class="social-button telegram-button" target="_blank">Telegram</a>
                 <a href="https://bio.link/raketbola" class="social-button whatsapp-button" target="_blank">WhatsApp</a>
             </div>
-        </div>
+        </section>
 
-        <div class="filters">
+        <!-- FILTERS -->
+        <section class="filters">
             <div class="view-toggles">
                 <button id="showEvents" class="view-btn active" onclick="switchView('events')">📅 Match Events</button>
                 <button id="showChannels" class="view-btn" onclick="switchView('channels')">📺 TV Channels</button>
             </div>
 
             <div class="filter-row">
-                <div class="filter-group" id="sport-filter-group" style="flex: 1; min-width: 150px;">
+                <div class="filter-group">
                     <label>Sport</label>
-                    <select id="sportFilter"><option value="">All Sports</option></select>
+                    <select id="sportFilter">
+                        <option value="">All Sports</option>
+                    </select>
                 </div>
-                <div class="filter-group" id="tournament-filter-group" style="flex: 1; min-width: 150px;">
+
+                <div class="filter-group">
                     <label>Tournament</label>
-                    <select id="tournamentFilter"><option value="">All Tournaments</option></select>
+                    <select id="tournamentFilter">
+                        <option value="">All Tournaments</option>
+                    </select>
                 </div>
-                <div class="filter-group" style="flex: 2; min-width: 200px;">
+
+                <div class="filter-group">
                     <label>Search</label>
                     <input type="text" id="searchFilter" placeholder="Search teams or leagues...">
                 </div>
             </div>
-        </div>
+        </section>
 
         <div class="stats" id="stats"></div>
         <div class="events" id="events"></div>
+
     </div>
 
-    <script src="script.js"></script>
-     <!-- Histats.com  START  (aync)-->
-<script type="text/javascript">var _Hasync= _Hasync|| [];
-_Hasync.push(['Histats.start', '1,4973595,4,0,0,0,00010000']);
-_Hasync.push(['Histats.fasi', '1']);
-_Hasync.push(['Histats.track_hits', '']);
-(function() {
-var hs = document.createElement('script'); hs.type = 'text/javascript'; hs.async = true;
-hs.src = ('//s10.histats.com/js15_as.js');
-(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(hs);
-})();</script>
-<noscript><a href="/" target="_blank"><img  src="//sstatic1.histats.com/0.gif?4973595&101" alt="site traffic analytics" border="0"></a></noscript>
-<!-- Histats.com  END  -->
+    <!-- MAIN SCRIPT -->
+    <script src="script.js" defer></script>
 
-<script async data-cfasync="false">
-  (function() {
-      const url = new URL(window.location.href);
-      const clickID = url.searchParams.get("click_id");
-      const sourceID = url.searchParams.get("source_id");
-
-      const s = document.createElement("script");
-      s.dataset.cfasync = "false";
-      s.src = "https://push-sdk.com/f/sdk.js?z=2387233";
-      s.onload = (opts) => {
-          opts.zoneID = 2387233;
-          opts.extClickID = clickID;
-          opts.subID1 = sourceID;
-          opts.actions.onPermissionGranted = () => {};
-          opts.actions.onPermissionDenied = () => {};
-          opts.actions.onAlreadySubscribed = () => {};
-          opts.actions.onError = () => {};
-      };
-      document.head.appendChild(s);
-  })()
-</script></body>
+</body>
 </html>
