@@ -285,7 +285,7 @@ window.openChannel = function (url, info, btn, event) {
         channelName = btn.textContent || btn.innerText;
     }
 
-    const finalUrl = 'https://dovkembed.pw/channel/' + encodeURIComponent(channelName.trim());
+    const finalUrl = 'https://dlhd.link/stream/stream-' + channelId + '.php';
 
     mPl.src = finalUrl;
     if(cCh) cCh.textContent = info;
